@@ -190,6 +190,7 @@
         const STATUS_DOC = 'admin_online';
         
         // --- !!! ВАЖНО: ВАШИ КЛЮЧИ FIREBASE !!! ---
+        // Убедитесь, что они заполнены
         const firebaseConfig = {
             apiKey: "AIzaSyBw_8Dx9gUI5tsUXSqX4Jd8hfjU4pNZGI8",
                     authDomain: "cpm-giveaway.firebaseapp.com",
@@ -199,9 +200,7 @@
         const publicDataPath = `artifacts/${appId}/public/data`;
 
         // --- !!! ВАЖНО: UID АДМИНИСТРАТОРА !!! ---
-        // 1. Создайте пользователя в Firebase Authentication
-        // 2. Скопируйте его UID
-        // 3. Вставьте его сюда.
+        // Убедитесь, что он заполнен UID пользователя, созданного в Firebase Auth
         const ADMIN_UID = "3O4TAW5vf3hM9gZCVpzMAKqzDS52"; 
         // -----------------------------------------------------------------
 
@@ -525,9 +524,16 @@
             const docRef = doc(db, `${publicDataPath}/app_status`, STATUS_DOC);
             toggleOnlineBtn.disabled = true;
             try {
-                // Определяем текущий статус по тексту кнопки
-                const currentStatus = toggleOnlineBtn.textContent.includes("ОФФЛАЙН"); 
-                await setDoc(docRef, { isOnline: currentStatus }, { merge: true });
+                // ИСПРАВЛЕНИЕ: Мы проверяем, содержит ли текст кнопки "ОНЛАЙН". 
+                // Если содержит, значит, мы хотим переключить в ОНЛАЙН (true).
+                // Если содержит "ОФФЛАЙН", значит, мы хотим переключить в ОФФЛАЙН (false).
+                const isNewStatusOnline = toggleOnlineBtn.textContent.includes("ОНЛАЙН"); 
+                
+                await setDoc(docRef, { isOnline: isNewStatusOnline }, { merge: true });
+                
+                // Сообщаем об успехе
+                showCustomMessage(`Статус сервера успешно переключен на ${isNewStatusOnline ? 'ОНЛАЙН' : 'ОФФЛАЙН'}.`);
+                
             } catch (error) {
                 console.error("Ошибка переключения статуса:", error);
                 showCustomMessage(`Ошибка переключения статуса: ${error.message}`);
