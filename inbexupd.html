@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заявки: Car Parking Multiplayer</title>
+    <!-- Подключаем Tailwind CSS для стилизации -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .status-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.875rem; 
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-pending { background-color: #FBBF24; color: #422006; } /* amber */
+        .status-in_progress { background-color: #3B82F6; color: #EFF6FF; } /* blue */
+        .status-ready-to-receive { background-color: #10B981; color: #ECFDF5; } /* green (Админ уведомил) */
+        .status-client_ready { background-color: #9333ea; color: #ffffff; } /* purple (Клиент готов) */
+        .status-completed { background-color: #4B5563; color: #E5E7EB; } /* gray */
+        
+        /* Стили для кастомного модального окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            max-width: 90%;
+            min-width: 300px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-xl mx-auto">
+        
+        <!-- Заголовок -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-extrabold text-indigo-700">Заявка на прокачку Car Parking</h1>
+            <p class="text-gray-500">Отслеживайте статус вашей заявки в реальном времени</p>
+        </header>
+        
+        <!-- Глобальный статус сервера -->
+        <div class="bg-white p-4 rounded-lg shadow-lg mb-6 border-l-4 border-indigo-500">
+            <h2 class="text-xl font-semibold mb-2 text-indigo-600">Статус Сервера</h2>
+            <div id="server-status-display" class="text-xl font-bold">
+                <span class="text-gray-400">Загрузка...</span>
+            </div>
+            <p id="server-message-display" class="text-gray-500 text-sm mt-1"></p>
+        </div>
+        
+        <!-- Индикатор загрузки -->
+        <div id="loading-indicator" class="text-center p-12 bg-white rounded-lg shadow-lg">
+             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+             <p class="text-lg text-indigo-700 font-medium">Подключение к системе...</p>
+        </div>
+
+        <!-- Основной контент приложения (Скрыт по умолчанию) -->
+        <div id="main-app-content" class="hidden">
+            
+            <!-- Показ ID клиента -->
+            <div class="text-center text-sm text-gray-500 mb-4">
+                Ваш Клиент ID: <span id="client-id-display" class="font-mono text-xs bg-gray-200 p-1 rounded"></span>
+            </div>
+
+            <!-- Секция: Моя Заявка (отображается при наличии заявки) -->
+            <div id="my-request-info" class="hidden bg-white p-6 rounded-lg shadow-xl mb-6 border-l-4 border-green-500">
+                <h2 class="text-2xl font-bold mb-4 text-green-700">Ваша Активная Заявка</h2>
+                
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-sm text-gray-500">ID Заявки: <span id="request-id-display" class="font-mono text-xs bg-gray-100 p-1 rounded"></span></p>
+                    <span id="request-status-tag" class="status-tag"></span>
+                </div>
+                
+                <p class="text-gray-700 mb-4">
+                    <span class="font-semibold text-indigo-600">Ваш ID (для админа):</span> 
+                    <span id="subscriber-name-display" class="font-medium"></span>
+                </p>
+                
+                <p class="text-gray-700 mb-4">
+                    <span class="font-semibold text-indigo-600">Запрос:</span> 
+                    <span id="request-details-display" class="font-medium"></span>
+                </p>
+                
+                <div class="mt-4 flex flex-col space-y-3">
+                    <!-- Кнопка "Я Готов Забрать" -->
+                    <button id="client-ready-btn" class="hidden w-full py-3 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 disabled:opacity-50" disabled>
+                        Я В ИГРЕ, ГОТОВ ЗАБРАТЬ!
+                    </button>
+                    <!-- Кнопка "Удалить/Очистить" -->
+                    <button id="clear-request-btn" class="w-full py-2 bg-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-400 transition duration-150">
+                        Сбросить заявку / Подать новую
+                    </button>
+                    <p id="client-ready-message" class="text-center text-sm text-purple-600 mt-2 hidden">
+                        ✅ Админ уведомлен о вашей готовности. Ждите!
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Секция: Форма Заявки (отображается при отсутствии заявки) -->
+            <div id="request-form-container" class="hidden bg-white p-6 rounded-lg shadow-xl">
+                <h2 class="text-2xl font-bold mb-4 text-indigo-600">Создать Новую Заявку</h2>
+                <form id="request-form">
+                    
+                    <div class="mb-4">
+                        <label for="subscriber-name" class="block text-sm font-medium text-gray-700 mb-1">Ваш ID в Car Parking Multiplayer</label>
+                        <input type="text" id="subscriber-name" name="subscriber-name" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Ваш ник или ID в игре">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="request-details" class="block text-sm font-medium text-gray-700 mb-1">Что нужно сделать?</label>
+                        <textarea id="request-details" name="request-details" rows="3" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Например: 'Прокачать Lamborghini, добавить 1695 л.с., 100 000 000 денег'"></textarea>
+                    </div>
+                    
+                    <button type="submit" id="submit-button" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 disabled:opacity-50">
+                        Отправить
+                    </button>
+                    
+                    <p id="form-error" class="text-red-500 text-sm mt-3"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Контейнер для кастомного модального окна -->
+    <div id="custom-modal-container"></div>
+    
+    <!-- Модуль Firebase -->
+    <script type="module">
+        // Импортируем необходимые функции Firebase (БЕЗ Auth)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            Timestamp,
+            setDoc,
+            setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // *** КОНФИГУРАЦИЯ FIREBASE: ОБЯЗАТЕЛЬНО ЗАМЕНИТЕ ЭТИ ПЛЕЙСХОЛДЕРЫ! ***
+        const FALLBACK_FIREBASE_CONFIG = {
+             apiKey: "AIzaSyBw_8Dx9gUI5tsUXSqX4Jd8hfjU4pNZGI8",
+                    authDomain: "cpm-giveaway.firebaseapp.com",
+                    projectId: "cpm-giveaway", 
+        };
+        // *******************************************************************
+        
+        // --- Глобальные переменные ---
+        let db;
+        let clientId; // НОВЫЙ ИДЕНТИФИКАТОР ВМЕСТО userId
+        let appId;
+        let requestsCollectionRef; 
+        let statusDocRef; 
+        let myRequestDocRef;
+        let unsubscribeMyRequest; 
+        
+        // Ключ для хранения локального ID клиента
+        const CLIENT_ID_KEY = 'cpmClientId'; 
+
+        // DOM элементы
+        const serverStatusDisplayEl = document.getElementById('server-status-display');
+        const serverMessageDisplayEl = document.getElementById('server-message-display');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const mainAppContent = document.getElementById('main-app-content');
+        const clientIdDisplayEl = document.getElementById('client-id-display');
+        
+        const requestFormContainer = document.getElementById('request-form-container');
+        const myRequestInfo = document.getElementById('my-request-info');
+        const subscriberNameInput = document.getElementById('subscriber-name');
+        const requestDetailsInput = document.getElementById('request-details');
+        const submitButton = document.getElementById('submit-button');
+        const formErrorEl = document.getElementById('form-error');
+        const clearRequestBtn = document.getElementById('clear-request-btn');
+        const clientReadyBtn = document.getElementById('client-ready-btn');
+        const clientReadyMessage = document.getElementById('client-ready-message');
+        
+        // Элементы отображения заявки
+        const requestStatusTag = document.getElementById('request-status-tag');
+        const subscriberNameDisplay = document.getElementById('subscriber-name-display');
+        const requestDetailsDisplay = document.getElementById('request-details-display');
+        const requestIdDisplay = document.getElementById('request-id-display');
+        
+        // Карта статусов для отображения
+        const STATUS_MAP = {
+            pending: "В ОЖИДАНИИ",
+            in_progress: "В РАБОТЕ",
+            ready_to_receive: "ГОТОВО К ПОЛУЧЕНИЮ",
+            client_ready: "КЛИЕНТ ГОТОВ ЗАБРАТЬ",
+            completed: "ЗАВЕРШЕНО"
+        };
+        // Классы стилей
+        const STATUS_CLASSES = {
+            pending: "status-pending",
+            in_progress: "status-in_progress",
+            ready_to_receive: "status-ready-to-receive", 
+            client_ready: "status-client_ready", 
+            completed: "status-completed"
+        };
+        
+        // --- Функция получения локального ID Клиента ---
+        function getClientId() {
+            let id = localStorage.getItem(CLIENT_ID_KEY);
+            if (!id) {
+                // Генерируем новый UUID (надежный и уникальный)
+                id = (typeof crypto.randomUUID === 'function') 
+                    ? crypto.randomUUID() 
+                    : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem(CLIENT_ID_KEY, id);
+            }
+            return id;
+        }
+
+        // --- Кастомный модальный диалог вместо alert/confirm ---
+        function showCustomMessage(message, callback = null) {
+            const container = document.getElementById('custom-modal-container');
+            container.innerHTML = `
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <p class="text-gray-800 mb-4">${message}</p>
+                        <div class="flex justify-end space-x-2">
+                            <button id="modal-ok" class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition duration-150">
+                                ${callback ? 'Понятно' : 'ОК'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const modalOk = document.getElementById('modal-ok');
+            modalOk.onclick = () => {
+                container.innerHTML = ''; // Закрыть модальное окно
+                if (callback) {
+                    callback();
+                }
+            };
+        }
+        
+        // --- 1. Инициализация Firebase и Установка ID ---
+        async function initializeFirebase() {
+            setLogLevel('Debug'); 
+            
+            try {
+                const firebaseConfig = typeof __firebase_config !== 'undefined' 
+                    ? JSON.parse(__firebase_config) 
+                    : FALLBACK_FIREBASE_CONFIG;
+                
+                if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ВСТАВЬТЕ")) {
+                    loadingIndicator.innerHTML = `<p class="mt-4 text-red-600 font-bold">ОШИБКА: Проверьте ключи Firebase!</p>
+                                                 <p class="mt-2 text-red-500 text-sm">Критическая ошибка инициализации Firebase: FirebaseError: Firebase: Error (auth/invalid-api-key).</p>`;
+                    return;
+                }
+                
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                
+                // Получаем или генерируем локальный ID клиента
+                clientId = getClientId();
+                clientIdDisplayEl.textContent = clientId;
+
+                // Скрываем индикатор загрузки и показываем основной контент
+                loadingIndicator.classList.add('hidden');
+                mainAppContent.classList.remove('hidden');
+
+                // ЗАПУСК ПОДПИСОК
+                // Получаем ID приложения
+                appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+                
+                // Путь к публичным заявкам
+                const publicDataPath = `artifacts/${appId}/public/data`; 
+                // Путь к приватному указателю заявки (используем clientId вместо userId)
+                const privateDataPath = `artifacts/${appId}/users/${clientId}`;
+
+                requestsCollectionRef = collection(db, `${publicDataPath}/requests_queue`);
+                statusDocRef = doc(db, `${publicDataPath}/app_status/admin_online`);
+                myRequestDocRef = doc(db, `${privateDataPath}/user_data/request_pointer`);
+
+                loadStatus();
+                loadMyRequestId();
+
+            } catch (error) {
+                console.error("Критическая ошибка инициализации Firebase:", error);
+                loadingIndicator.innerHTML = `<p class="mt-4 text-red-600 font-bold">КРИТИЧЕСКАЯ ОШИБКА: ${error.message}. Проверьте ключи Firebase и правила безопасности!</p>`;
+            }
+        }
+
+        // --- 2. Загрузка глобального статуса сервера ---
+        function loadStatus() {
+            // ... (логика осталась прежней)
+            onSnapshot(statusDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const isOnline = data.isOnline || false;
+                    const message = data.message || (isOnline ? "Раздача активна" : "Раздача приостановлена");
+                    
+                    serverStatusDisplayEl.innerHTML = isOnline 
+                        ? `<span class="text-green-600">ОНЛАЙН</span>` 
+                        : `<span class="text-red-600">ОФФЛАЙН</span>`;
+                    serverMessageDisplayEl.textContent = message;
+
+                    // Если сервер оффлайн, блокируем форму
+                    if (!isOnline && requestFormContainer.classList.contains('flex')) {
+                        showCustomMessage(`Админ сейчас ${STATUS_MAP.completed}. Подача новых заявок временно приостановлена.`);
+                        submitButton.disabled = true;
+                        submitButton.textContent = "Сервер ОФФЛАЙН";
+                    } else if (isOnline && !myRequestInfo.classList.contains('flex')) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = "Отправить";
+                    }
+
+                } else {
+                    serverStatusDisplayEl.innerHTML = `<span class="text-red-600">ОФФЛАЙН (Документ не найден)</span>`;
+                    serverMessageDisplayEl.textContent = "Админ еще не включал сервер.";
+                }
+            }, (error) => {
+                console.error("Ошибка прослушивания статуса сервера:", error);
+            });
+        }
+        
+        // --- 3. Загрузка ID заявки пользователя ---
+        async function loadMyRequestId() {
+            // Подписываемся на документ-указатель, который хранит ID заявки
+            // Документ теперь находится по пути: .../users/{clientId}/user_data/request_pointer
+            onSnapshot(myRequestDocRef, (docSnap) => {
+                const data = docSnap.data();
+                const requestId = data?.cpmRequestId || localStorage.getItem('cpmRequestId'); // Fallback на localStorage
+                
+                if (requestId) {
+                    localStorage.setItem('cpmRequestId', requestId); // Обновляем localStorage на всякий случай
+                    loadMyRequestDetails(requestId);
+                } else {
+                    // Заявки нет
+                    unsubscribeMyRequest?.(); // Отписываемся от старых деталей
+                    showForm();
+                }
+            }, (error) => {
+                console.error("Ошибка загрузки указателя заявки:", error);
+                // Продолжаем, используя только localStorage
+                const localId = localStorage.getItem('cpmRequestId');
+                if (localId) loadMyRequestDetails(localId); else showForm();
+            });
+        }
+
+        // --- 4. Загрузка деталей заявки ---
+        function loadMyRequestDetails(requestId) {
+            // ... (логика осталась прежней)
+            unsubscribeMyRequest?.(); 
+            
+            const requestRef = doc(requestsCollectionRef, requestId);
+
+            unsubscribeMyRequest = onSnapshot(requestRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const req = docSnap.data();
+                    displayRequestInfo(req, requestId);
+                } else {
+                    // Заявка была удалена админом
+                    showCustomMessage("Ваша заявка была завершена и удалена админом. Вы можете подать новую!");
+                    clearMyRequest(false); // Очищаем без предупреждения, так как админ завершил
+                }
+            }, (error) => {
+                console.error("Ошибка прослушивания деталей заявки:", error);
+                showCustomMessage(`Ошибка получения деталей заявки. Возможно, она была удалена. ${error.message}`);
+                clearMyRequest(false);
+            });
+        }
+        
+        // --- 5. Отображение заявки ---
+        function displayRequestInfo(req, requestId) {
+            // ... (логика осталась прежней)
+            requestFormContainer.classList.add('hidden');
+            myRequestInfo.classList.remove('hidden');
+            
+            const statusText = STATUS_MAP[req.status] || 'Неизвестно';
+            const statusClass = STATUS_CLASSES[req.status] || 'status-completed';
+
+            requestStatusTag.className = `status-tag ${statusClass}`;
+            requestStatusTag.textContent = statusText;
+            subscriberNameDisplay.textContent = req.subscriberId || 'ID не указано';
+            requestDetailsDisplay.textContent = req.requestDetails;
+            requestIdDisplay.textContent = requestId.substring(0, 6) + '...';
+
+            // Управление кнопкой "Я Готов Забрать"
+            const isReady = req.status === 'ready-to-receive' || req.status === 'ready_to_receive';
+            const clientHasConfirmed = req.status === 'client_ready';
+            
+            if (isReady && !clientHasConfirmed) {
+                clientReadyBtn.classList.remove('hidden');
+                clientReadyBtn.disabled = false;
+                clientReadyMessage.classList.add('hidden');
+            } else if (clientHasConfirmed) {
+                clientReadyBtn.classList.add('hidden');
+                clientReadyMessage.classList.remove('hidden');
+            } else {
+                clientReadyBtn.classList.add('hidden');
+                clientReadyMessage.classList.add('hidden');
+            }
+        }
+
+        // --- 6. Отображение формы ---
+        function showForm() {
+            // ... (логика осталась прежней)
+            myRequestInfo.classList.add('hidden');
+            requestFormContainer.classList.remove('hidden');
+        }
+        
+        // --- 7. Отправка формы ---
+        document.getElementById('request-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = subscriberNameInput.value.trim();
+            const details = requestDetailsInput.value.trim();
+            
+            if (!name || !details) {
+                formErrorEl.textContent = "Пожалуйста, заполните все поля.";
+                return;
+            }
+            
+            submitButton.disabled = true;
+            submitButton.textContent = "Отправка...";
+            formErrorEl.textContent = "";
+
+            try {
+                // 1. Создаем новую заявку
+                const newDocRef = await addDoc(requestsCollectionRef, {
+                    subscriberId: name, // Используем subscriberId, как в админке
+                    requestDetails: details,
+                    status: "pending", 
+                    createdAt: Timestamp.now(),
+                    // Используем clientId (UUID) вместо userId
+                    addedBy: clientId 
+                });
+
+                // 2. Сохраняем ID новой заявки в документ-указатель пользователя
+                await setDoc(myRequestDocRef, {
+                    cpmRequestId: newDocRef.id,
+                    lastUpdate: Timestamp.now()
+                }, { merge: true });
+                
+                subscriberNameInput.value = '';
+                requestDetailsInput.value = '';
+                
+            } catch (error) {
+                console.error("Ошибка добавления заявки:", error);
+                formErrorEl.textContent = `Ошибка: ${error.message}`;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = "Отправить";
+            }
+        });
+        
+        // --- 8. Кнопка "Я Готов Забрать" ---
+        clientReadyBtn.addEventListener('click', async () => {
+             const requestId = localStorage.getItem('cpmRequestId');
+             if (!requestId) return;
+             
+             clientReadyBtn.disabled = true;
+             clientReadyBtn.textContent = 'Уведомляем админа...';
+             
+             const requestRef = doc(requestsCollectionRef, requestId);
+             
+             try {
+                 await updateDoc(requestRef, {
+                     status: 'client_ready', // Устанавливаем новый, приоритетный статус
+                     clientReadyAt: Timestamp.now(), // Фиксируем время готовности клиента
+                     lastUpdated: Timestamp.now()
+                 });
+                 // UI обновится через onSnapshot
+             } catch (error) {
+                 console.error("Ошибка подтверждения готовности:", error);
+                 showCustomMessage(`Ошибка: Не удалось подтвердить готовность. ${error.message}`);
+                 clientReadyBtn.disabled = false;
+                 clientReadyBtn.textContent = 'Я В ИГРЕ, ГОТОВ ЗАБРАТЬ!';
+             }
+        });
+        
+        // --- 9. Кнопка "Удалить/Очистить" ---
+        clearRequestBtn.addEventListener('click', () => {
+            showCustomMessage("Вы уверены, что хотите сбросить статус своей заявки и иметь возможность подать новую? Админ все еще будет видеть старую заявку в очереди, пока не завершит ее. Нажмите 'Понятно', чтобы продолжить.", () => clearMyRequest(true));
+        });
+        
+        async function clearMyRequest(shouldClearPointer = false) {
+             // 1. Очищаем localStorage (для fallback)
+             localStorage.removeItem('cpmRequestId');
+             
+             if (shouldClearPointer && myRequestDocRef) {
+                 // 2. Удаляем указатель из Firestore, чтобы loadMyRequestId() переключился на форму
+                 try {
+                     await deleteDoc(myRequestDocRef);
+                 } catch (e) {
+                     console.error("Не удалось удалить указатель заявки из Firestore", e);
+                     // Не показываем ошибку пользователю, так как это не критично
+                 }
+             }
+
+             unsubscribeMyRequest?.(); // Отписываемся
+             showForm(); // Переключаемся на форму
+        }
+
+        // Замена alert на кастомное окно
+        window.alert = showCustomMessage;
+        
+        // --- Запуск ---\
+        initializeFirebase();
+
+    </script>
+</body>
+</html>
+
