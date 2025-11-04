@@ -17,29 +17,53 @@
             display: inline-block;
             padding: 4px 12px;
             border-radius: 9999px;
-            font-size: 0.875rem; /* 14px */
+            font-size: 0.875rem; 
             font-weight: 600;
             text-transform: uppercase;
+            white-space: nowrap;
         }
-        /* Цвета для статусов заявок (Обновлены) */
-        .status-pending { background-color: #FBBF24; color: #422006; }
-        .status-in_progress { background-color: #3B82F6; color: #EFF6FF; }
-        .status-ready-to-receive { background-color: #10B981; color: #ECFDF5; } /* Готово к получению (Админ уведомил) */
-        .status-client_ready { background-color: #9333ea; color: #ffffff; } /* Клиент готов забрать (Фиолетовый, ВЫСШИЙ ПРИОРИТЕТ) */
-        .status-completed { background-color: #4B5563; color: #E5E7EB; } /* Завершено/Удалено */
+        /* Цвета для статусов заявок */
+        .status-pending { background-color: #FBBF24; color: #422006; } /* amber */
+        .status-in_progress { background-color: #3B82F6; color: #EFF6FF; } /* blue */
+        .status-ready_to_receive { background-color: #10B981; color: #ECFDF5; } /* green */
+        .status-client_ready { background-color: #9333ea; color: #ffffff; } /* purple (клиент подтвердил) */
+        .status-completed { background-color: #4B5563; color: #E5E7EB; } /* gray */
         
-        /* Эффект при наведении на карточку заявки */
+        /* Эффект при наведении на карточку */
+        .request-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
         .request-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
         }
         
-        /* Стили для кнопок управления */
-        .status-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background-color 0.15s ease-in-out;
+        /* Цветовые акценты для карточек */
+        .card-pending { border-left: 5px solid #FBBF24; }
+        .card-in_progress { border-left: 5px solid #3B82F6; }
+        .card-ready_to_receive { border-left: 5px solid #10B981; }
+        .card-client_ready { border-left: 5px solid #9333ea; }
+        
+        /* Стили для кастомного модального окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            max-width: 90%;
+            min-width: 300px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
         }
     </style>
 </head>
@@ -48,537 +72,521 @@
     <div class="max-w-4xl mx-auto">
         
         <!-- Заголовок -->
-        <header class="mb-8 text-center">
-            <h1 class="text-4xl font-extrabold text-indigo-700">Админ-панель Car Parking</h1>
-            <p class="text-xl text-gray-500">Управление очередью заявок</p>
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-indigo-700">Админ-панель: Очередь CPM</h1>
+            <p class="text-gray-500 font-medium mt-2">Управление заявками и статусом сервера</p>
+            <p class="text-sm text-gray-400 mt-1">
+                <a href="../index.html" class="text-indigo-500 hover:text-indigo-700 hover:underline">← Назад к Клиентской странице</a>
+            </p>
         </header>
-
-        <!-- Раздел Входа и Статуса -->
-        <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-lg border-l-4 border-indigo-500">
-            <div id="auth-status-header" class="text-lg font-semibold text-gray-700">
-                Статус: Ожидание...
+        
+        <!-- Блок логина -->
+        <div id="login-container" class="max-w-sm mx-auto bg-white p-8 rounded-lg shadow-xl mb-8 border-t-4 border-red-500">
+            <h2 class="text-2xl font-bold mb-6 text-center text-red-600">Вход для Администратора</h2>
+            
+            <p id="auth-error-message" class="text-red-500 text-sm mb-4 hidden font-medium"></p>
+            
+            <div class="mb-4">
+                <label for="admin-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" id="admin-email" placeholder="admin@example.com"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
             </div>
-            <button id="auth-button" class="px-4 py-2 rounded-lg text-white font-medium transition duration-150 bg-indigo-600 hover:bg-indigo-700">
-                Войти через Google
+            <div class="mb-6">
+                <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+                <input type="password" id="admin-password" placeholder="********"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            
+            <button id="login-btn" class="w-full py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 disabled:opacity-50">
+                Войти
+            </button>
+            
+            <p class="text-xs text-gray-500 mt-4 text-center">
+                Только авторизованные пользователи могут управлять очередью.
+            </p>
+        </div>
+        
+        <!-- Индикатор загрузки -->
+        <div id="loading-indicator" class="text-center p-10 hidden">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p class="mt-4 text-indigo-600 font-medium">Проверка данных...</p>
+        </div>
+
+        <!-- Основной контент (скрыт до успешной авторизации) -->
+        <div id="main-app-content" class="hidden">
+            
+            <!-- Управление статусом сервера -->
+            <div class="bg-white p-6 rounded-lg shadow-xl mb-8 border-t-4 border-indigo-500">
+                <h2 class="text-xl font-bold mb-4 text-indigo-700">Статус Сервера</h2>
+                
+                <div class="flex items-center space-x-4 mb-4">
+                    <span id="server-status-display" class="font-bold text-lg text-gray-700">
+                        Статус: Загрузка...
+                    </span>
+                    <button id="toggle-online-btn" class="py-2 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-150 disabled:opacity-50">
+                        Перевести в ОНЛАЙН
+                    </button>
+                </div>
+                
+                <label for="server-message-input" class="block text-sm font-medium text-gray-700 mb-1">
+                    Сообщение статуса (для клиентов):
+                </label>
+                <div class="flex space-x-3">
+                    <input type="text" id="server-message-input" placeholder="Введите сообщение (например, 'Идет работа с 4 очередью')"
+                           class="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <button id="update-message-btn" class="py-2 px-4 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 disabled:opacity-50">
+                        Обновить
+                    </button>
+                </div>
+            </div>
+            
+            <h2 class="text-2xl font-bold text-indigo-700 mb-4">Текущая Очередь Заявок (<span id="queue-count">0</span>)</h2>
+            
+            <div id="requests-list" class="space-y-4">
+                <!-- Карточки заявок будут вставлены здесь -->
+            </div>
+            
+            <p id="empty-queue-message" class="p-6 bg-gray-200 text-gray-600 rounded-lg text-center mt-6 hidden">
+                ✅ Очередь пуста! Все заявки обработаны.
+            </p>
+            
+            <button id="logout-btn" class="mt-8 w-full py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition duration-150">
+                Выйти из системы
             </button>
         </div>
 
-        <!-- Контейнер основного контента (Скрыт по умолчанию) -->
-        <div id="admin-content" class="hidden">
-        
-            <!-- Раздел Управления Статусом Сервера -->
-            <div class="bg-white p-6 rounded-lg shadow-lg mb-8 border-t-4 border-indigo-500">
-                <h2 class="text-2xl font-semibold mb-4 text-indigo-600">Статус Сервера</h2>
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    
-                    <!-- Текущий статус -->
-                    <div class="flex-grow">
-                        <p class="text-sm font-medium text-gray-500">Текущее состояние:</p>
-                        <div id="server-status-display" class="text-3xl font-bold">
-                            <span class="text-gray-400 animate-pulse">Загрузка...</span>
-                        </div>
-                    </div>
-
-                    <!-- Поле для сообщения -->
-                    <div class="w-full md:w-1/2">
-                        <label for="status-message" class="block text-sm font-medium text-gray-700 mb-1">Сообщение для клиентов</label>
-                        <input type="text" id="status-message" placeholder="Раздача активна"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-
-                    <!-- Кнопки управления -->
-                    <div class="flex space-x-3 mt-2 md:mt-0">
-                        <button id="set-online-btn" class="status-btn bg-green-500 text-white hover:bg-green-600 disabled:opacity-50">
-                            ВКЛ (ONLINE)
-                        </button>
-                        <button id="set-offline-btn" class="status-btn bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">
-                            ВЫКЛ (OFFLINE)
-                        </button>
-                    </div>
-                </div>
-                <div id="status-error" class="text-red-500 text-sm mt-3"></div>
-            </div>
-
-            <!-- Раздел Списка Заявок -->
-            <div class="bg-white p-6 rounded-lg shadow-lg">
-                <h2 class="text-2xl font-semibold mb-4 text-indigo-600">Очередь Заявок (<span id="request-count">0</span>)</h2>
-                <div id="request-list" class="space-y-4">
-                    <!-- Заявки будут добавлены сюда -->
-                    <div id="loading-requests" class="text-center py-8 text-gray-500">Загрузка заявок...</div>
-                    <div id="no-requests" class="text-center py-8 text-gray-500 hidden">
-                        <p class="text-lg">Очередь пуста!</p>
-                        <p class="text-sm">Нажмите "ВКЛ (ONLINE)", чтобы начать прием заявок.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Раздел ОТКАЗА В ДОСТУПЕ (Скрыт по умолчанию) -->
-        <div id="access-denied" class="hidden text-center p-12 bg-red-100 rounded-lg shadow-lg border-l-8 border-red-500 mt-8">
-            <h2 class="text-3xl font-bold text-red-700 mb-4">Доступ Запрещен</h2>
-            <p class="text-lg text-red-600">Ваш аккаунт не является администратором этого приложения.</p>
-            <p class="text-sm text-red-400 mt-2">
-                <span class="font-bold">ID пользователя:</span> <span id="unauthorized-uid"></span>
-            </p>
-            <p class="text-sm text-red-400 mt-2 font-bold">
-                <span class="text-red-700">Скопируйте ID выше</span> и вставьте его в код для получения доступа.
-            </p>
-        </div>
-        
-        <div id="auth-info" class="text-xs text-gray-400 mt-6 text-center">
-             Статус аутентификации: <span id="auth-status">Подключение...</span>
-        </div>
     </div>
-    
+
+    <!-- Контейнер для кастомного модального окна -->
+    <div id="custom-modal-container"></div>
+
     <!-- Модуль Firebase -->
     <script type="module">
         // Импортируем необходимые функции Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
-            onAuthStateChanged,
-            GoogleAuthProvider,
-            signInWithPopup,
-            signOut,
+            signInWithEmailAndPassword, // Новая функция для входа по email/паролю
+            signOut, // Новая функция для выхода
+            onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
             doc, 
-            updateDoc, 
-            deleteDoc, 
+            setDoc, 
             onSnapshot, 
             collection, 
-            query,
-            setDoc, 
-            Timestamp,
-            setLogLevel
+            query, 
+            updateDoc,
+            deleteDoc,
+            setLogLevel 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // *** КОНФИГУРАЦИЯ FIREBASE ***
-        // Убедитесь, что эта конфигурация соответствует той, что в Клиенте (fix_index.html)
-        const FALLBACK_FIREBASE_CONFIG = {
-             apiKey: "AIzaSyBw_8Dx9gUI5tsUXSqX4Jd8hfjU4pNZGI8",
+        // --- Глобальные переменные ---
+        let db;
+        let auth;
+        let userId = null; 
+        const QUEUE_COLLECTION = 'requests_queue';
+        const STATUS_DOC = 'admin_online';
+        
+        // --- !!! ВАЖНО: ВАШИ КЛЮЧИ FIREBASE !!! ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBw_8Dx9gUI5tsUXSqX4Jd8hfjU4pNZGI8",
                     authDomain: "cpm-giveaway.firebaseapp.com",
                     projectId: "cpm-giveaway", 
         };
-        // *****************************
-            // --- 0. КОНСТАНТЫ АДМИНИСТРАТОРОВ (АВТОРИЗАЦИЯ) ---
-        // !!! КРИТИЧНО: Замените 'YOUR_ADMIN_UID_HERE' на ваш реальный Google UID. 
-        // Если вам нужен доступ для нескольких админов, добавьте их ID через запятую.
-        const ADMIN_Uids = ['9zjSu0LuCMhKDn7CKAYkqOR6XPy2']; 
+        const appId = firebaseConfig.projectId; // Используем projectId как appId
+        const publicDataPath = `artifacts/${appId}/public/data`;
 
-        
-        // --- Глобальные переменные ---
-        let db, auth;
-        let userId;
-        let appId;
-        let requestsCollectionRef; 
-        let statusDocRef; 
+        // --- !!! ВАЖНО: UID АДМИНИСТРАТОРА !!! ---
+        // 1. Создайте пользователя в Firebase Authentication
+        // 2. Скопируйте его UID
+        // 3. Вставьте его сюда.
+        const ADMIN_UID = "3O4TAW5vf3hM9gZCVpzMAKqzDS52"; 
+        // -----------------------------------------------------------------
 
         // DOM элементы
+        const requestsListEl = document.getElementById('requests-list');
+        const emptyQueueMessageEl = document.getElementById('empty-queue-message');
+        const queueCountEl = document.getElementById('queue-count');
         const serverStatusDisplayEl = document.getElementById('server-status-display');
-        const statusMessageInput = document.getElementById('status-message');
-        const setOnlineBtn = document.getElementById('set-online-btn');
-        const setOfflineBtn = document.getElementById('set-offline-btn');
-        const statusErrorEl = document.getElementById('status-error');
-        const requestListEl = document.getElementById('request-list');
-        const loadingRequestsEl = document.getElementById('loading-requests');
-        const noRequestsEl = document.getElementById('no-requests');
-        const requestCountEl = document.getElementById('request-count');
-        const authStatusEl = document.getElementById('auth-status');
+        const toggleOnlineBtn = document.getElementById('toggle-online-btn');
+        const serverMessageInput = document.getElementById('server-message-input');
+        const updateMessageBtn = document.getElementById('update-message-btn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const mainAppContent = document.getElementById('main-app-content');
+        const loginContainer = document.getElementById('login-container');
+        const adminEmailInput = document.getElementById('admin-email');
+        const adminPasswordInput = document.getElementById('admin-password');
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authErrorMessage = document.getElementById('auth-error-message');
         
-        // UI элементы для авторизации
-        const authButton = document.getElementById('auth-button');
-        const authStatusHeader = document.getElementById('auth-status-header');
-        const adminContent = document.getElementById('admin-content');
-        const accessDenied = document.getElementById('access-denied');
-        const unauthorizedUidEl = document.getElementById('unauthorized-uid');
-        
-        // Карта статусов для отображения (ОБНОВЛЕНА)
+        // Карта статусов для отображения
         const STATUS_MAP = {
             pending: "В ОЖИДАНИИ",
             in_progress: "В РАБОТЕ",
-            ready_to_receive: "ГОТОВО (К ПОЛУЧЕНИЮ)", // Статус, когда админ уведомил
-            client_ready: "КЛИЕНТ ГОТОВ ЗАБРАТЬ", // Новый статус: клиент уведомил админа
-            completed: "ЗАВЕРШЕНО/УДАЛИТЬ"
+            ready_to_receive: "ГОТОВО К ПОЛУЧЕНИЮ", 
+            client_ready: "КЛИЕНТ В ИГРЕ", 
+            completed: "ЗАВЕРШЕНО"
         };
-        // Классы стилей (ОБНОВЛЕНЫ)
+        // Классы стилей
         const STATUS_CLASSES = {
             pending: "status-pending",
             in_progress: "status-in_progress",
-            ready_to_receive: "status-ready-to-receive", 
-            client_ready: "status-client_ready", 
+            ready_to_receive: "status-ready_to_receive",
+            client_ready: "status-client_ready",
             completed: "status-completed"
         };
+        const CARD_CLASSES = {
+            pending: "card-pending",
+            in_progress: "card-in_progress",
+            ready_to_receive: "card-ready_to_receive",
+            client_ready: "card-client_ready",
+        };
+
+        // --- Кастомный модальный диалог вместо alert/confirm ---
+        function showCustomMessage(message) {
+            const container = document.getElementById('custom-modal-container');
+            container.innerHTML = `
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <p class="text-gray-800 mb-4">${message}</p>
+                        <div class="flex justify-end">
+                            <button id="modal-ok" class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition duration-150">
+                                ОК
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const modalOk = document.getElementById('modal-ok');
+            modalOk.onclick = () => {
+                container.innerHTML = ''; // Закрыть модальное окно
+            };
+        }
         
-        // --- 1. Инициализация Firebase ---
+        // --- 1. Инициализация Firebase и Проверка Аутентификации ---
         async function initializeFirebase() {
-            setLogLevel('Debug'); 
-            authStatusEl.textContent = "Инициализация...";
+            setLogLevel('Debug');
+            loadingIndicator.classList.remove('hidden');
 
+            // Проверка, что ключи Firebase заполнены
+            if (firebaseConfig.apiKey.includes('**ВСТАВЬТЕ')) {
+                 loadingIndicator.innerHTML = `<p class="mt-4 text-red-600 font-bold">КРИТИЧЕСКАЯ ОШИБКА: Заполните ключи Firebase Config.</p>`;
+                 return;
+            }
+            if (ADMIN_UID === "ВАШ_UID_АДМИНА_ИЗ_FIREBASE_КОНСОЛИ") {
+                 loadingIndicator.innerHTML = `<p class="mt-4 text-red-600 font-bold">КРИТИЧЕСКАЯ ОШИБКА: Заполните ADMIN_UID в коде.</p>`;
+                 return;
+            }
+            
             try {
-                // Пытаемся получить ID приложения из глобальной переменной, иначе используем projectId из конфига
-                appId = typeof __app_id !== 'undefined' ? __app_id : FALLBACK_FIREBASE_CONFIG.projectId || 'default-app-id';
-                
-                const firebaseConfig = typeof __firebase_config !== 'undefined' 
-                    ? JSON.parse(__firebase_config) 
-                    : FALLBACK_FIREBASE_CONFIG;
-
-                if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("ВАШ_API_KEY")) {
-                    authStatusEl.textContent = "ОШИБКА: Проверьте ключи Firebase!";
-                    serverStatusDisplayEl.innerHTML = `<span class="text-red-600">ОШИБКА КЛЮЧЕЙ</span>`;
-                    return; 
-                }
-
+                // Инициализация Firebase
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // Формируем пути к коллекциям/документам
-                const publicDataPath = `artifacts/${appId}/public/data`;
-                requestsCollectionRef = collection(db, `${publicDataPath}/requests_queue`);
-                statusDocRef = doc(db, `${publicDataPath}/app_status/admin_online`);
-                
-                setupAuthAndAuthorization();
+                // Прослушиваем изменение состояния аутентификации
+                onAuthStateChanged(auth, (user) => {
+                    loadingIndicator.classList.add('hidden');
+                    
+                    if (user && user.uid === ADMIN_UID) {
+                        // Успешная авторизация администратора
+                        userId = user.uid;
+                        showAdminPanel();
+                    } else {
+                        // Пользователь не авторизован или не является админом
+                        userId = null;
+                        showLoginForm();
+                        if (user) {
+                            // Если вошел, но UID не совпадает с админским, выходим
+                            signOut(auth); 
+                            authErrorMessage.textContent = "У вас нет прав администратора.";
+                            authErrorMessage.classList.remove('hidden');
+                        }
+                    }
+                });
 
             } catch (error) {
                 console.error("Критическая ошибка инициализации Firebase:", error);
-                authStatusEl.textContent = `КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`;
+                loadingIndicator.innerHTML = `<p class="mt-4 text-red-600 font-bold">КРИТИЧЕСКАЯ ОШИБКА: ${error.message}. Проверьте ключи Firebase и правила безопасности!</p>`;
             }
         }
-
-        // --- 2. Аутентификация и Авторизация ---
         
-        function isUserAdmin(uid) {
-            // Проверяем, находится ли UID текущего пользователя в списке администраторов
-            return ADMIN_Uids.includes(uid); 
+        // --- 2. Логика отображения ---
+        function showAdminPanel() {
+            loginContainer.classList.add('hidden');
+            mainAppContent.classList.remove('hidden');
+            authErrorMessage.classList.add('hidden');
+            loadServerStatusAndRequests();
         }
 
-        async function handleSignIn() {
-            try {
-                const provider = new GoogleAuthProvider();
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                console.error("Ошибка входа через Google:", error);
-                statusErrorEl.textContent = `Ошибка входа: ${error.message}`;
+        function showLoginForm() {
+            loginContainer.classList.remove('hidden');
+            mainAppContent.classList.add('hidden');
+        }
+
+        // --- 3. Функции входа и выхода ---
+        loginBtn.addEventListener('click', async () => {
+            const email = adminEmailInput.value.trim();
+            const password = adminPasswordInput.value.trim();
+            
+            if (!email || !password) {
+                authErrorMessage.textContent = "Введите Email и Пароль.";
+                authErrorMessage.classList.remove('hidden');
+                return;
             }
-        }
-
-        async function handleSignOut() {
+            
+            loginBtn.disabled = true;
+            authErrorMessage.classList.add('hidden');
+            
             try {
-                await signOut(auth);
+                // Вход через Email и Пароль
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged обработает успешный вход и проверку ADMIN_UID
             } catch (error) {
-                console.error("Ошибка выхода:", error);
-                statusErrorEl.textContent = `Ошибка выхода: ${error.message}`;
-            }
-        }
-
-        authButton.addEventListener('click', () => {
-            if (auth.currentUser) {
-                handleSignOut();
-            } else {
-                handleSignIn();
+                console.error("Ошибка входа:", error);
+                authErrorMessage.textContent = "Ошибка входа. Проверьте Email/Пароль.";
+                authErrorMessage.classList.remove('hidden');
+                loginBtn.disabled = false;
             }
         });
         
-        async function setupAuthAndAuthorization() {
-            authStatusEl.textContent = "Ожидание входа...";
-            
-            onAuthStateChanged(auth, (user) => {
-                
-                adminContent.classList.add('hidden');
-                accessDenied.classList.add('hidden');
-                
-                if (user) {
-                    userId = user.uid;
-                    // Отображаем часть email или UID
-                    authStatusHeader.textContent = `Вход как: ${user.email || user.uid.substring(0, 6) + '...'}`;
-                    authButton.textContent = 'Выйти';
-                    authButton.className = 'px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition duration-150';
-                    
-                    if (isUserAdmin(userId)) {
-                        // ПОЛЬЗОВАТЕЛЬ АВТОРИЗОВАН КАК АДМИН
-                        authStatusEl.textContent = `Администратор (ID: ${userId.substring(0, 6)}...)`;
-                        adminContent.classList.remove('hidden'); 
-                        
-                        // Предупреждение о плейсхолдере
-                        if (ADMIN_Uids.includes('YOUR_ADMIN_UID_HERE')) {
-                            statusErrorEl.textContent = "⚠️ ВНИМАНИЕ! Замените 'YOUR_ADMIN_UID_HERE' на свой ID в коде!";
-                        } else {
-                            statusErrorEl.textContent = '';
-                        }
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showCustomMessage("Вы успешно вышли из системы.");
+            } catch (error) {
+                console.error("Ошибка выхода:", error);
+                showCustomMessage(`Ошибка выхода: ${error.message}`);
+            }
+        });
 
-                        setupServerStatusListener();
-                        setupRequestsListener();
-                        
-                    } else {
-                        // ДОСТУП ЗАПРЕЩЕН
-                        authStatusEl.textContent = 'Ошибка доступа (не админ)';
-                        unauthorizedUidEl.textContent = userId;
-                        accessDenied.classList.remove('hidden'); 
-                    }
-                    
-                } else {
-                    // ПОЛЬЗОВАТЕЛЬ НЕ АВТОРИЗОВАН
-                    userId = null;
-                    authStatusHeader.textContent = 'Статус: Не авторизован';
-                    authButton.textContent = 'Войти через Google';
-                    authButton.className = 'px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition duration-150';
-                    authStatusEl.textContent = 'Требуется вход';
-                }
-            });
-        }
-        
-        // --- 3. Прослушиватель статуса сервера ---
-        function setupServerStatusListener() {
+
+        // --- 4. Запуск подписок на статус и очередь (только после входа) ---
+        function loadServerStatusAndRequests() {
+            // Загрузка глобального статуса сервера
+            const statusDocRef = doc(db, `${publicDataPath}/app_status`, STATUS_DOC);
             onSnapshot(statusDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.isOnline || false;
-                    const message = data.message || (isOnline ? "Раздача активна" : "Раздача приостановлена");
-                    
-                    serverStatusDisplayEl.innerHTML = isOnline 
-                        ? `<span class="text-green-600">ОНЛАЙН</span>` 
-                        : `<span class="text-red-600">ОФФЛАЙН</span>`;
-                    statusMessageInput.value = message;
-                    
-                    // Управление кнопками
-                    setOnlineBtn.disabled = isOnline;
-                    setOfflineBtn.disabled = !isOnline;
-
+                    updateServerStatusDisplay(data.isOnline, data.message);
                 } else {
-                    // Если документ статуса не существует
-                    serverStatusDisplayEl.innerHTML = `<span class="text-red-600">ОФФЛАЙН</span>`;
-                    statusMessageInput.value = "Раздача приостановлена";
-                    setOnlineBtn.disabled = false;
-                    setOfflineBtn.disabled = true;
+                    // Создаем документ статуса, если он не существует (по умолчанию оффлайн)
+                    setDoc(statusDocRef, { isOnline: false, message: "Раздача приостановлена" }, { merge: true });
+                    updateServerStatusDisplay(false, "Раздача приостановлена");
                 }
             }, (error) => {
                 console.error("Ошибка прослушивания статуса сервера:", error);
-                statusErrorEl.textContent = "Ошибка связи с Firestore. Проверьте правила безопасности!";
             });
-        }
-        
-        // --- 4. Прослушиватель очереди заявок ---
-        function setupRequestsListener() {
-            const requestsQuery = query(requestsCollectionRef); 
             
-            loadingRequestsEl.classList.remove('hidden');
-            noRequestsEl.classList.add('hidden');
-            requestListEl.innerHTML = ''; 
-
-            onSnapshot(requestsQuery, (snapshot) => {
+            // Загрузка очереди заявок
+            const queueCollectionRef = collection(db, `${publicDataPath}/${QUEUE_COLLECTION}`);
+            onSnapshot(queueCollectionRef, (querySnapshot) => {
                 const requests = [];
-                snapshot.forEach(doc => {
+                querySnapshot.forEach(doc => {
                     requests.push({ id: doc.id, ...doc.data() });
                 });
-
+                
+                // Сортировка по дате создания (createdAt)
+                requests.sort((a, b) => {
+                    const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                    const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                    return aTime - bTime;
+                });
+                
                 renderRequests(requests);
-                loadingRequestsEl.classList.add('hidden'); 
             }, (error) => {
-                console.error("Ошибка прослушивания заявок:", error);
-                statusErrorEl.textContent = "Ошибка загрузки списка заявок.";
-                loadingRequestsEl.classList.add('hidden');
+                console.error("Ошибка прослушивания очереди:", error);
             });
         }
-        
-        // --- 5. Отрисовка списка заявок (СОРТИРОВКА ПО ПРИОРИТЕТУ) ---
+
+        // --- 5. Обновление отображения статуса сервера ---
+        function updateServerStatusDisplay(isOnline, message) {
+            const statusText = isOnline ? "ОНЛАЙН" : "ОФФЛАЙН";
+            const messageText = message || (isOnline ? "Раздача активна" : "Раздача приостановлена");
+            
+            serverStatusDisplayEl.innerHTML = `<span class="font-bold text-${isOnline ? 'green' : 'red'}-600">${statusText}</span>: ${messageText}`;
+            toggleOnlineBtn.textContent = isOnline ? "Перевести в ОФФЛАЙН" : "Перевести в ОНЛАЙН";
+            toggleOnlineBtn.classList.toggle('bg-red-500', isOnline);
+            toggleOnlineBtn.classList.toggle('hover:bg-red-600', isOnline);
+            toggleOnlineBtn.classList.toggle('bg-green-500', !isOnline);
+            toggleOnlineBtn.classList.toggle('hover:bg-green-600', !isOnline);
+            
+            serverMessageInput.value = messageText;
+        }
+
+        // --- 6. Отображение списка заявок ---
         function renderRequests(requests) {
+            queueCountEl.textContent = requests.length;
+            requestsListEl.innerHTML = '';
             
-            // Логика сортировки (Приоритет: client_ready -> ready_to_receive -> in_progress -> pending)
-            requests.sort((a, b) => {
-                // client_ready - самый высокий приоритет (1), чтобы админ увидел
-                const statusOrder = { client_ready: 1, ready_to_receive: 2, in_progress: 3, pending: 4, completed: 5 };
-                
-                // 1. Сортировка по статусу
-                const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
-                if (statusDiff !== 0) return statusDiff;
-
-                // 2. Сортировка по дате (самые старые вверху в рамках одного статуса)
-                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-                return dateA - dateB;
-            });
-            
-            requestListEl.innerHTML = '';
-            requestCountEl.textContent = requests.length;
-
             if (requests.length === 0) {
-                noRequestsEl.classList.remove('hidden');
-                return;
+                emptyQueueMessageEl.classList.remove('hidden');
+            } else {
+                emptyQueueMessageEl.classList.add('hidden');
+                requests.forEach(request => {
+                    requestsListEl.appendChild(renderRequestCard(request));
+                });
             }
-            noRequestsEl.classList.add('hidden');
-
-
-            requests.forEach(req => {
-                const reqEl = document.createElement('div');
-                reqEl.id = `request-${req.id}`;
-                
-                // Если клиент готов, выделяем карточку фиолетовой рамкой
-                const cardClass = req.status === 'client_ready' 
-                    ? 'request-card bg-white p-4 rounded-md shadow transition duration-200 border-l-4 border-purple-500 hover:border-purple-700'
-                    : 'request-card bg-white p-4 rounded-md shadow transition duration-200 border-l-4 border-indigo-200 hover:border-indigo-400';
-                    
-                reqEl.className = cardClass;
-                
-                const statusText = STATUS_MAP[req.status] || 'Неизвестно';
-                const statusClass = STATUS_CLASSES[req.status] || 'status-pending';
-                const createdAt = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleString('ru-RU') : 'Нет даты';
-                
-                const subscriberIdentifier = req.subscriberId || 'ID не указано';
-
-                let clientReadyBadge = '';
-                if (req.status === 'client_ready') {
-                    // Яркий бэйдж для самого высокого приоритета
-                    clientReadyBadge = `<span class="text-xs font-bold text-red-700 bg-red-200 px-2 py-1 rounded-full ml-3 animate-pulse">КЛИЕНТ ЖДЕТ В ИГРЕ!</span>`;
-                }
-
-                reqEl.innerHTML = `
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
-                            <p class="text-xs text-gray-400">ID Заявки Firestore: ${req.id.substring(0, 6)}</p>
-                            <h3 class="text-xl font-bold text-indigo-800">
-                                Car Parking ID: ${subscriberIdentifier}
-                                ${clientReadyBadge}
-                            </h3>
-                        </div>
-                        <span class="status-tag ${statusClass}">${statusText}</span>
-                    </div>
-                    
-                    <p class="text-gray-600 mb-2">
-                        <span class="font-medium text-gray-800">Запрос:</span> ${req.requestDetails}
-                    </p>
-                    <p class="text-xs text-gray-500 mb-4">
-                        Добавлено: ${createdAt} (Пользователь: ${req.addedBy.substring(0, 6)}...)
-                    </p>
-                    
-                    <div class="flex flex-wrap gap-2 text-sm">
-                        ${createActionButton('pending', req.id, req.status, 'В Ожидании')}
-                        ${createActionButton('in_progress', req.id, req.status, 'В Работе')}
-                        ${createActionButton('ready_to_receive', req.id, req.status, 'Готово (Уведомить клиента)')}
-                        
-                        <!-- Кнопка удаления/завершения, всегда доступна -->
-                        ${createActionButton('completed', req.id, req.status, 'Завершить/Удалить', true)} 
-                    </div>
-                `;
-                requestListEl.appendChild(reqEl);
-            });
         }
         
-        // --- Вспомогательная функция для кнопок (ОБНОВЛЕНА) ---
-        function createActionButton(newStatus, id, currentStatus, label, isFinal = false) {
-            const isCurrent = newStatus === currentStatus;
-            const disabledAttr = isCurrent ? 'disabled' : '';
-            const bgColor = isFinal ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-200 hover:bg-gray-300';
-            const textColor = isFinal ? 'text-white' : 'text-gray-700';
+        // --- 7. Генерация карточки заявки ---
+        function renderRequestCard(data) {
+            const card = document.createElement('div');
+            const statusClass = CARD_CLASSES[data.status] || 'card-pending';
+            const statusTagClass = STATUS_CLASSES[data.status] || 'status-pending';
+            const statusText = STATUS_MAP[data.status] || 'НЕИЗВЕСТНО';
             
-            const action = isFinal ? 'delete' : 'update';
-            
-            // Если заявка client_ready, кнопки in_progress/ready_to_receive/pending не нужны, 
-            // так как следующий логичный шаг - завершение (completed).
-            if (currentStatus === 'client_ready' && newStatus !== 'completed' && newStatus !== 'client_ready') {
-                return '';
-            }
-            
-            // Если текущий статус ready_to_receive, кнопка ready_to_receive должна быть скрыта
-            if (currentStatus === 'ready_to_receive' && newStatus === 'ready_to_receive') {
-                return ''; 
-            }
-            
-            // Не позволяем переводить из completed во что-либо еще
-             if (currentStatus === 'completed' && newStatus !== 'completed') {
-                return '';
-            }
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString('ru-RU') : 'Неизвестно';
+            const clientReadyAt = data.clientReadyAt?.toDate ? `<p class="text-sm font-semibold text-purple-700 mt-2">Клиент готов с: ${data.clientReadyAt.toDate().toLocaleTimeString('ru-RU')}</p>` : '';
 
+            card.className = `request-card bg-white p-6 rounded-lg shadow-md mb-4 flex flex-col md:flex-row justify-between ${statusClass}`;
+            
+            // Основная информация
+            card.innerHTML = `
+                <div class="flex-grow">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <span class="status-tag ${statusTagClass}">${statusText}</span>
+                        <p class="text-xs text-gray-500">Заявка от: ${createdAt}</p>
+                    </div>
+                    
+                    ${data.status === 'client_ready' ? `<div class="p-2 bg-purple-100 border border-purple-500 rounded mb-3 font-bold text-purple-800">❗ ОЖИДАЕТСЯ: КЛИЕНТ В ИГРЕ!</div>` : ''}
 
-            return `
-                <button data-id="${id}" 
-                        data-status="${newStatus}" 
-                        data-action="${action}"
-                        ${disabledAttr}
-                        class="status-btn ${bgColor} ${textColor} text-xs disabled:bg-indigo-100 disabled:text-indigo-400 disabled:cursor-not-allowed">
-                    ${label}
-                </button>
+                    <p class="text-gray-800 font-bold mb-1">ID Подписчика (для связи):</p>
+                    <p class="font-mono text-sm bg-gray-100 p-1 rounded mb-3 max-w-full overflow-auto break-words">${data.subscriberId || 'N/A'}</p>
+                    
+                    <p class="text-gray-800 font-bold mb-1">Детали Запроса:</p>
+                    <p class="text-lg text-gray-900 mb-4 break-words">${data.requestDetails}</p>
+                    
+                    ${clientReadyAt}
+                </div>
+                
+                <!-- Кнопки действий -->
+                <div class="md:ml-6 mt-4 md:mt-0 flex flex-col space-y-2 w-full md:w-48 flex-shrink-0">
+                    <button data-id="${data.id}" data-status="in_progress" class="change-status-btn py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition">В РАБОТЕ</button>
+                    <button data-id="${data.id}" data-status="ready_to_receive" class="change-status-btn py-2 px-4 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition">ГОТОВО</button>
+                    <button data-id="${data.id}" data-status="completed" class="change-status-btn py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition">ЗАВЕРШЕНО</button>
+                    <button data-id="${data.id}" class="delete-request-btn py-2 px-4 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition">УДАЛИТЬ</button>
+                </div>
             `;
-        }
-        
-        // --- 6. Обработчики событий (Обновление статуса/Удаление) ---
-        requestListEl.addEventListener('click', async (e) => {
-            const btn = e.target.closest('.status-btn');
-            if (!btn || btn.disabled) return;
-
-            const id = btn.getAttribute('data-id');
-            const action = btn.getAttribute('data-action');
-            const newStatus = btn.getAttribute('data-status');
             
-            const docRef = doc(requestsCollectionRef, id);
+            return card;
+        }
 
-            btn.disabled = true;
-            btn.textContent = '...';
-
+        // --- 8. Обработчик изменения статуса/удаления ---
+        async function updateRequestStatus(docId, newStatus) {
+            const docRef = doc(db, `${publicDataPath}/${QUEUE_COLLECTION}`, docId);
             try {
-                if (action === 'delete') {
-                    // Удаление - это завершающий статус
+                // Если статус переходит в "Завершено" - удаляем документ
+                if (newStatus === 'completed') {
                     await deleteDoc(docRef);
+                    showCustomMessage(`Заявка ${docId.substring(0, 8)}... ЗАВЕРШЕНА и удалена из очереди.`);
                 } else {
-                    // Обновление статуса
-                    const updatePayload = {
+                    // В остальных случаях обновляем статус
+                    await updateDoc(docRef, { 
                         status: newStatus,
-                        lastUpdated: Timestamp.now()
-                    };
-                    
-                    // Если админ переводит в ready_to_receive, сбрасываем clientReadyAt, если он был
-                    if (newStatus === 'ready_to_receive') {
-                        updatePayload.clientReadyAt = null; 
-                    }
-                    
-                    await updateDoc(docRef, updatePayload);
+                        lastUpdated: new Date()
+                    });
+                    showCustomMessage(`Статус заявки ${docId.substring(0, 8)}... изменен на ${STATUS_MAP[newStatus]}.`);
                 }
             } catch (error) {
-                console.error(`Ошибка при ${action} заявки ${id}:`, error);
-                statusErrorEl.textContent = `Ошибка при обновлении заявки: ${error.message}`;
-            } finally {
-                 // onSnapshot обновит UI, когда изменения будут применены
+                console.error("Ошибка обновления статуса/удаления:", error);
+                showCustomMessage(`Ошибка при изменении статуса: ${error.message}`);
+            }
+        }
+        
+        // --- 9. Обработчики кнопок ---
+        
+        // Обработчик нажатий на список заявок
+        requestsListEl.addEventListener('click', async (e) => {
+            const target = e.target;
+            const docId = target.dataset.id;
+            
+            if (target.classList.contains('change-status-btn')) {
+                const newStatus = target.dataset.status;
+                if (docId) {
+                    await updateRequestStatus(docId, newStatus);
+                }
+            } else if (target.classList.contains('delete-request-btn')) {
+                if (docId) {
+                    const isConfirmed = await window.confirm(`Вы уверены, что хотите НАВСЕГДА удалить заявку ${docId.substring(0, 8)}...?`);
+                    if (isConfirmed) {
+                        await updateRequestStatus(docId, 'completed'); // Используем удаление через 'completed'
+                    }
+                }
             }
         });
 
-        // --- 7. Обработчики управления статусом сервера ---
+        // Обработчик переключения ОНЛАЙН/ОФФЛАЙН
+        toggleOnlineBtn.addEventListener('click', async () => {
+            const docRef = doc(db, `${publicDataPath}/app_status`, STATUS_DOC);
+            toggleOnlineBtn.disabled = true;
+            try {
+                // Определяем текущий статус по тексту кнопки
+                const currentStatus = toggleOnlineBtn.textContent.includes("ОФФЛАЙН"); 
+                await setDoc(docRef, { isOnline: currentStatus }, { merge: true });
+            } catch (error) {
+                console.error("Ошибка переключения статуса:", error);
+                showCustomMessage(`Ошибка переключения статуса: ${error.message}`);
+            } finally {
+                toggleOnlineBtn.disabled = false;
+            }
+        });
         
-        setOnlineBtn.addEventListener('click', () => updateServerStatus(true));
-        setOfflineBtn.addEventListener('click', () => updateServerStatus(false));
-        
-        async function updateServerStatus(isOnline) {
-            if (!statusDocRef || !userId) {
-                statusErrorEl.textContent = "Ошибка: база данных не инициализирована или пользователь не авторизован.";
+        // Обработчик обновления сообщения
+        updateMessageBtn.addEventListener('click', async () => {
+            const message = serverMessageInput.value.trim();
+            if (message.length < 5) {
+                showCustomMessage("Сообщение должно быть длиннее 5 символов.");
                 return;
             }
-            
-            setOnlineBtn.disabled = true;
-            setOfflineBtn.disabled = true;
-
-            const message = statusMessageInput.value.trim() || (isOnline ? "Раздача активна" : "Раздача приостановлена");
-            
+            const docRef = doc(db, `${publicDataPath}/app_status`, STATUS_DOC);
+            updateMessageBtn.disabled = true;
             try {
-                // Используем setDoc с merge: true для обновления
-                await setDoc(statusDocRef, {
-                    isOnline: isOnline,
-                    message: message,
-                    lastUpdateBy: userId,
-                    timestamp: Timestamp.now()
-                }, { merge: true });
-                
-                statusErrorEl.textContent = '';
+                await updateDoc(docRef, { message: message });
+                showCustomMessage("Сообщение статуса обновлено.");
             } catch (error) {
-                console.error("Ошибка обновления статуса сервера:", error);
-                statusErrorEl.textContent = `Ошибка: ${error.message}`;
+                console.error("Ошибка обновления сообщения:", error);
+                showCustomMessage(`Ошибка обновления сообщения: ${error.message}`);
             } finally {
-                // Кнопки будут разблокированы через listener onSnapshot
+                updateMessageBtn.disabled = false;
             }
-        }
+        });
+        
+        // --- 10. Замена alert/confirm ---
+        window.alert = showCustomMessage;
+        window.confirm = (message) => {
+            return new Promise(resolve => {
+                const container = document.getElementById('custom-modal-container');
+                container.innerHTML = `
+                    <div class="modal-overlay">
+                        <div class="modal-content">
+                            <p class="text-gray-800 mb-4">${message}</p>
+                            <div class="flex justify-end space-x-3">
+                                <button id="modal-cancel" class="px-4 py-2 bg-gray-300 text-gray-800 font-medium rounded-lg hover:bg-gray-400 transition duration-150">Отмена</button>
+                                <button id="modal-confirm" class="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition duration-150">Подтвердить</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('modal-cancel').onclick = () => {
+                    container.innerHTML = '';
+                    resolve(false);
+                };
+                document.getElementById('modal-confirm').onclick = () => {
+                    container.innerHTML = '';
+                    resolve(true);
+                };
+            });
+        };
 
         // --- Запуск ---
         initializeFirebase();
 
     </script>
 </body>
-  </html>
+</html>
